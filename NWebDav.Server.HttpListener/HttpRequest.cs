@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-
 using NWebDav.Server.Http;
 
 namespace NWebDav.Server.HttpListener

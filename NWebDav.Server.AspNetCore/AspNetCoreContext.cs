@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 
@@ -15,7 +16,7 @@ namespace NWebDav.Server.AspNetCore
                 throw new ArgumentNullException(nameof(httpContext));
 
             // Save request, response and session
-            Request = new AspNetCoreRequest(httpContext.Request);
+            Request = new AspNetCoreRequest(httpContext.Request, httpContext.RequestAborted);
             Response = new AspNetCoreResponse(httpContext.Response);
             Session = new AspNetCoreSession(httpContext.User);
         }

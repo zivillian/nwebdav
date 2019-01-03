@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -32,7 +33,7 @@ namespace NWebDav.Server.Handlers
         /// A task that represents the asynchronous MOVE operation. The task
         /// will always return <see langword="true"/> upon completion.
         /// </returns>
-        public async Task<bool> HandleRequestAsync(IHttpContext httpContext, IStore store)
+        public async Task<bool> HandleRequestAsync(IHttpContext httpContext, IStore store, CancellationToken cancellationToken)
         {
             // Obtain request and response
             var request = httpContext.Request;
@@ -42,7 +43,7 @@ namespace NWebDav.Server.Handlers
             var splitSourceUri = RequestHelper.SplitUri(request.Url);
 
             // Obtain source collection
-            var sourceCollection = await store.GetCollectionAsync(splitSourceUri.CollectionUri, httpContext).ConfigureAwait(false);
+            var sourceCollection = await store.GetCollectionAsync(splitSourceUri.CollectionUri, httpContext, cancellationToken).ConfigureAwait(false);
             if (sourceCollection == null)
             {
                 // Source not found
@@ -71,7 +72,7 @@ namespace NWebDav.Server.Handlers
             var splitDestinationUri = RequestHelper.SplitUri(destinationUri);
 
             // Obtain destination collection
-            var destinationCollection = await store.GetCollectionAsync(splitDestinationUri.CollectionUri, httpContext).ConfigureAwait(false);
+            var destinationCollection = await store.GetCollectionAsync(splitDestinationUri.CollectionUri, httpContext, cancellationToken).ConfigureAwait(false);
             if (destinationCollection == null)
             {
                 // Source not found
@@ -84,7 +85,7 @@ namespace NWebDav.Server.Handlers
             if (!overwrite)
             {
                 // If overwrite is false and destination exist ==> Precondition Failed
-                var destItem = await destinationCollection.GetItemAsync(splitDestinationUri.Name, httpContext).ConfigureAwait(false);
+                var destItem = await destinationCollection.GetItemAsync(splitDestinationUri.Name, httpContext, cancellationToken).ConfigureAwait(false);
                 if (destItem != null)
                 {
                     // Cannot overwrite destination item
@@ -97,7 +98,7 @@ namespace NWebDav.Server.Handlers
             var errors = new UriResultCollection();
 
             // Move collection
-            await MoveAsync(sourceCollection, splitSourceUri.Name, destinationCollection, splitDestinationUri.Name, overwrite, httpContext, splitDestinationUri.CollectionUri, errors).ConfigureAwait(false);
+            await MoveAsync(sourceCollection, splitSourceUri.Name, destinationCollection, splitDestinationUri.Name, overwrite, httpContext, splitDestinationUri.CollectionUri, errors, cancellationToken).ConfigureAwait(false);
 
             // Check if there are any errors
             if (errors.HasItems)
@@ -106,7 +107,7 @@ namespace NWebDav.Server.Handlers
                 var xDocument = new XDocument(errors.GetXmlMultiStatus());
 
                 // Stream the document
-                await response.SendResponseAsync(DavStatusCode.MultiStatus, xDocument).ConfigureAwait(false);
+                await response.SendResponseAsync(DavStatusCode.MultiStatus, xDocument, cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -117,17 +118,17 @@ namespace NWebDav.Server.Handlers
             return true;
         }
 
-        private async Task MoveAsync(IStoreCollection sourceCollection, string sourceName, IStoreCollection destinationCollection, string destinationName, bool overwrite, IHttpContext httpContext, Uri baseUri, UriResultCollection errors)
+        private async Task MoveAsync(IStoreCollection sourceCollection, string sourceName, IStoreCollection destinationCollection, string destinationName, bool overwrite, IHttpContext httpContext, Uri baseUri, UriResultCollection errors, CancellationToken cancellationToken)
         {
             // Determine the new base URI
             var subBaseUri = UriHelper.Combine(baseUri, destinationName);
 
             // Obtain the actual item
-            var moveItem = await sourceCollection.GetItemAsync(sourceName, httpContext).ConfigureAwait(false);
+            var moveItem = await sourceCollection.GetItemAsync(sourceName, httpContext, cancellationToken).ConfigureAwait(false);
             if (moveItem is IStoreCollection moveCollection && !moveCollection.SupportsFastMove(destinationCollection, destinationName, overwrite, httpContext))
             {
                 // Create a new collection
-                var newCollectionResult = await destinationCollection.CreateCollectionAsync(destinationName, overwrite, httpContext).ConfigureAwait(false);
+                var newCollectionResult = await destinationCollection.CreateCollectionAsync(destinationName, overwrite, httpContext, cancellationToken).ConfigureAwait(false);
                 if (newCollectionResult.Result != DavStatusCode.Created && newCollectionResult.Result != DavStatusCode.NoContent)
                 {
                     errors.AddResult(subBaseUri, newCollectionResult.Result);
@@ -135,18 +136,18 @@ namespace NWebDav.Server.Handlers
                 }
 
                 // Move all sub items
-                foreach (var entry in await moveCollection.GetItemsAsync(httpContext).ConfigureAwait(false))
-                    await MoveAsync(moveCollection, entry.Name, newCollectionResult.Collection, entry.Name, overwrite, httpContext, subBaseUri, errors).ConfigureAwait(false);
+                foreach (var entry in await moveCollection.GetItemsAsync(httpContext, cancellationToken).ConfigureAwait(false))
+                    await MoveAsync(moveCollection, entry.Name, newCollectionResult.Collection, entry.Name, overwrite, httpContext, subBaseUri, errors, cancellationToken).ConfigureAwait(false);
 
                 // Delete the source collection
-                var deleteResult = await sourceCollection.DeleteItemAsync(sourceName, httpContext).ConfigureAwait(false);
+                var deleteResult = await sourceCollection.DeleteItemAsync(sourceName, httpContext, cancellationToken).ConfigureAwait(false);
                 if (deleteResult != DavStatusCode.Ok)
                     errors.AddResult(subBaseUri, newCollectionResult.Result);
             }
             else
             {
                 // Items should be moved directly
-                var result = await sourceCollection.MoveItemAsync(sourceName, destinationCollection, destinationName, overwrite, httpContext).ConfigureAwait(false);
+                var result = await sourceCollection.MoveItemAsync(sourceName, destinationCollection, destinationName, overwrite, httpContext, cancellationToken).ConfigureAwait(false);
                 if (result.Result != DavStatusCode.Created && result.Result != DavStatusCode.NoContent)
                     errors.AddResult(subBaseUri, result.Result);
             }

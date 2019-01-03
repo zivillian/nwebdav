@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 namespace NWebDav.Server.Http
 {
@@ -105,5 +106,5 @@ namespace NWebDav.Server.Http
         /// </para>
         /// </remarks>
         Stream Stream { get; }
-    }
+   }
 }

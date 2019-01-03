@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -114,14 +115,14 @@ namespace NWebDav.Server.Handlers
         /// A task that represents the asynchronous PROPPATCH operation. The task
         /// will always return <see langword="true"/> upon completion.
         /// </returns>
-        public async Task<bool> HandleRequestAsync(IHttpContext httpContext, IStore store)
+        public async Task<bool> HandleRequestAsync(IHttpContext httpContext, IStore store, CancellationToken cancellationToken)
         {
             // Obtain request and response
             var request = httpContext.Request;
             var response = httpContext.Response;
 
             // Obtain item
-            var item = await store.GetItemAsync(request.Url, httpContext).ConfigureAwait(false);
+            var item = await store.GetItemAsync(request.Url, httpContext, cancellationToken).ConfigureAwait(false);
             if (item == null)
             {
                 response.SetStatus(DavStatusCode.NotFound);
@@ -148,7 +149,7 @@ namespace NWebDav.Server.Handlers
                 DavStatusCode result;
                 try
                 {
-                    result = await item.PropertyManager.SetPropertyAsync(httpContext, item, propSet.Name, propSet.Value).ConfigureAwait(false);
+                    result = await item.PropertyManager.SetPropertyAsync(httpContext, item, propSet.Name, propSet.Value, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception)
                 {
@@ -162,7 +163,7 @@ namespace NWebDav.Server.Handlers
             var xDocument = new XDocument(propSetCollection.GetXmlMultiStatus(request.Url));
 
             // Stream the document
-            await response.SendResponseAsync(DavStatusCode.MultiStatus, xDocument).ConfigureAwait(false);
+            await response.SendResponseAsync(DavStatusCode.MultiStatus, xDocument, cancellationToken).ConfigureAwait(false);
             return true;
         }
     }

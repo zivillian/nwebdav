@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
 using NWebDav.Server.Helpers;
 using NWebDav.Server.Http;
@@ -30,7 +31,7 @@ namespace NWebDav.Server.Handlers
         /// A task that represents the asynchronous PUT operation. The task
         /// will always return <see langword="true"/> upon completion.
         /// </returns>
-        public async Task<bool> HandleRequestAsync(IHttpContext httpContext, IStore store)
+        public async Task<bool> HandleRequestAsync(IHttpContext httpContext, IStore store, CancellationToken cancellationToken)
         {
             // Obtain request and response
             var request = httpContext.Request;
@@ -40,7 +41,7 @@ namespace NWebDav.Server.Handlers
             var splitUri = RequestHelper.SplitUri(request.Url);
 
             // Obtain collection
-            var collection = await store.GetCollectionAsync(splitUri.CollectionUri, httpContext).ConfigureAwait(false);
+            var collection = await store.GetCollectionAsync(splitUri.CollectionUri, httpContext, cancellationToken).ConfigureAwait(false);
             if (collection == null)
             {
                 // Source not found
@@ -49,12 +50,12 @@ namespace NWebDav.Server.Handlers
             }
 
             // Obtain the item
-            var result = await collection.CreateItemAsync(splitUri.Name, true, httpContext).ConfigureAwait(false);
+            var result = await collection.CreateItemAsync(splitUri.Name, true, httpContext, cancellationToken).ConfigureAwait(false);
             var status = result.Result;
             if (status == DavStatusCode.Created || status == DavStatusCode.NoContent)
             {
                 // Upload the information to the item
-                var uploadStatus = await result.Item.UploadFromStreamAsync(httpContext, request.Stream).ConfigureAwait(false);
+                var uploadStatus = await result.Item.UploadFromStreamAsync(httpContext, request.Stream, cancellationToken).ConfigureAwait(false);
                 if (uploadStatus != DavStatusCode.Ok)
                     status = uploadStatus;
             }

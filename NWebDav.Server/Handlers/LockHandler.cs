@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -35,7 +36,7 @@ namespace NWebDav.Server.Handlers
         /// A task that represents the asynchronous LOCK operation. The task
         /// will always return <see langword="true"/> upon completion.
         /// </returns>
-        public async Task<bool> HandleRequestAsync(IHttpContext httpContext, IStore store)
+        public async Task<bool> HandleRequestAsync(IHttpContext httpContext, IStore store, CancellationToken cancellationToken)
         {
             // Obtain request and response
             var request = httpContext.Request;
@@ -46,7 +47,7 @@ namespace NWebDav.Server.Handlers
             var timeouts = request.GetTimeouts();
 
             // Obtain the WebDAV item
-            var item = await store.GetItemAsync(request.Url, httpContext).ConfigureAwait(false);
+            var item = await store.GetItemAsync(request.Url, httpContext, cancellationToken).ConfigureAwait(false);
             if (item == null)
             {
                 // Set status to not found
@@ -70,7 +71,7 @@ namespace NWebDav.Server.Handlers
             if (refreshLockToken != null)
             {
                 // Obtain the token
-                lockResult = lockingManager.RefreshLock(item, depth > 0, timeouts, refreshLockToken);
+                lockResult = await lockingManager.RefreshLockAsync(item, depth > 0, timeouts, refreshLockToken, cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -123,7 +124,7 @@ namespace NWebDav.Server.Handlers
                 }
 
                 // Perform the lock
-                lockResult = lockingManager.Lock(item, lockType, lockScope, owner, request.Url, depth > 0, timeouts);
+                lockResult = await lockingManager.LockAsync(item, lockType, lockScope, owner, request.Url, depth > 0, timeouts, cancellationToken).ConfigureAwait(false);
             }
 
             // Check if result is fine
@@ -149,7 +150,7 @@ namespace NWebDav.Server.Handlers
                 response.SetHeaderValue("Lock-Token", $"<{lockResult.Lock.Value.LockToken.AbsoluteUri}>");
 
             // Stream the document
-            await response.SendResponseAsync(DavStatusCode.Ok, xDocument).ConfigureAwait(false);
+            await response.SendResponseAsync(DavStatusCode.Ok, xDocument, cancellationToken).ConfigureAwait(false);
             return true;
         }
     }

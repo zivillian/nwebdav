@@ -2,7 +2,7 @@
 using System.Net;
 using System.Security;
 using System.Security.Principal;
-
+using System.Threading;
 using NWebDav.Server.Http;
 
 namespace NWebDav.Server.HttpListener
